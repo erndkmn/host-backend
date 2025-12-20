@@ -6,7 +6,11 @@ const app = express();
 const PORT = 3001;
 
 // allow frontend to call your backend
-app.use(cors());
+app.use(cors({
+  origin: '*', // or specify your frontend domain
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
 
 // parse json request bodies
 app.use(express.json());
