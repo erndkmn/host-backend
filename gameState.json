@@ -1,0 +1,108 @@
+{
+  "history": {
+    "2025-12-09": {
+      "id": "rollbot",
+      "image": "https://unhbvkszwhczbjxgetgk.supabase.co/storage/v1/object/public/images/arc-raiders/images/rollbot.webp"
+    },
+    "2025-12-08": {
+      "id": "matriarch",
+      "image": "https://cdn.metaforge.app/arc-raiders/images/matriarch.webp"
+    },
+    "2025-12-07": {
+      "id": "queen",
+      "image": "https://unhbvkszwhczbjxgetgk.supabase.co/storage/v1/object/public/images/arc-raiders/images/queen_image.jpg"
+    },
+    "2025-12-06": {
+      "id": "wasp",
+      "image": "https://unhbvkszwhczbjxgetgk.supabase.co/storage/v1/object/public/images/arc-raiders/images/wasp.webp"
+    },
+    "2025-12-05": {
+      "id": "hornet",
+      "image": "https://unhbvkszwhczbjxgetgk.supabase.co/storage/v1/object/public/images/arc-raiders/images/hornet.webp"
+    },
+    "2025-12-04": {
+      "id": "bison",
+      "image": "https://unhbvkszwhczbjxgetgk.supabase.co/storage/v1/object/public/images/arc-raiders/images/bison.webp"
+    },
+    "2025-12-03": {
+      "id": "pop",
+      "image": "https://cdn.metaforge.app/arc-raiders/images/pop.webp"
+    },
+    "2025-12-02": {
+      "id": "rocketeer",
+      "image": "https://unhbvkszwhczbjxgetgk.supabase.co/storage/v1/object/public/images/arc-raiders/images/rocketeer.webp"
+    },
+    "2025-12-01": {
+      "id": "tick",
+      "image": "https://unhbvkszwhczbjxgetgk.supabase.co/storage/v1/object/public/images/arc-raiders/images/tick.webp"
+    },
+    "2025-11-30": {
+      "id": "snitch",
+      "image": "https://unhbvkszwhczbjxgetgk.supabase.co/storage/v1/object/public/images/arc-raiders/images/snitch.webp"
+    },
+    "2025-11-29": {
+      "id": "shredder",
+      "image": "https://cdn.metaforge.app/arc-raiders/images/shredder.webp"
+    },
+    "2025-11-28": {
+      "id": "turret",
+      "image": "https://unhbvkszwhczbjxgetgk.supabase.co/storage/v1/object/public/images/arc-raiders/images/turret.webp"
+    },
+    "2025-11-27": {
+      "id": "fireball",
+      "image": "https://cdn.metaforge.app/arc-raiders/images/fireball.webp"
+    },
+    "2025-11-26": {
+      "id": "sentinel",
+      "image": "https://unhbvkszwhczbjxgetgk.supabase.co/storage/v1/object/public/images/arc-raiders/images/sentinel.webp"
+    },
+    "2025-11-25": {
+      "id": "bastion",
+      "image": "https://unhbvkszwhczbjxgetgk.supabase.co/storage/v1/object/public/images/arc-raiders/images/bastion.webp"
+    },
+    "2025-11-24": {
+      "id": "bombardier",
+      "image": ""
+    },
+    "2025-12-10": {
+      "id": "bastion",
+      "image": "https://unhbvkszwhczbjxgetgk.supabase.co/storage/v1/object/public/images/arc-raiders/images/bastion.webp"
+    },
+    "2025-12-11": {
+      "id": "rocketeer",
+      "image": "https://unhbvkszwhczbjxgetgk.supabase.co/storage/v1/object/public/images/arc-raiders/images/rocketeer.webp"
+    },
+    "2025-12-14": {
+      "id": "rollbot",
+      "image": "https://unhbvkszwhczbjxgetgk.supabase.co/storage/v1/object/public/images/arc-raiders/images/rollbot.webp"
+    },
+    "2025-12-15": {
+      "id": "sentinel",
+      "image": "https://unhbvkszwhczbjxgetgk.supabase.co/storage/v1/object/public/images/arc-raiders/images/sentinel.webp"
+    },
+    "2025-12-16": {
+      "id": "hornet",
+      "image": "https://unhbvkszwhczbjxgetgk.supabase.co/storage/v1/object/public/images/arc-raiders/images/hornet.webp"
+    }
+  },
+  "availableIds": [
+    "matriarch",
+    "queen",
+    "wasp",
+    "bison",
+    "pop",
+    "tick",
+    "snitch",
+    "shredder",
+    "turret",
+    "fireball"
+  ],
+  "shownIds": [
+    "bombardier",
+    "bastion",
+    "rocketeer",
+    "rollbot",
+    "sentinel",
+    "hornet"
+  ]
+}
