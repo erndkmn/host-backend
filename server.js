@@ -7,9 +7,11 @@ const PORT = 8080;
 
 // allow frontend to call your backend
 app.use(cors({
-  origin: '*', // or specify your frontend domain
+  origin: ['https://raiderdle.com/', 'https://www.raiderdle.com/'],
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true, // Erlaubt Cookies/Auth-Header, falls du sie später brauchst
+  optionsSuccessStatus: 204
 }));
 
 // parse json request bodies
