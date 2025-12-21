@@ -3,7 +3,6 @@ import cors from "cors";
 import metaforgeRouter from "./routes.js";
 
 const app = express();
-const cors = require('cors');
 const PORT = 8080;
 
 // allow frontend to call your backend
@@ -17,6 +16,9 @@ app.use(cors({
 
 // parse json request bodies
 app.use(express.json());
+
+// VERY IMPORTANT for preflight
+app.options('*', cors());
 
 // mount your router
 app.use("/api", metaforgeRouter);
