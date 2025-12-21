@@ -3,7 +3,7 @@ import cors from "cors";
 import metaforgeRouter from "./routes.js";
 
 const app = express();
-const PORT = 3001;
+const PORT = 443;
 
 // allow frontend to call your backend
 app.use(cors({
