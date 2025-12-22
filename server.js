@@ -14,6 +14,13 @@ app.use(cors({
   optionsSuccessStatus: 204
 }));
 
+// Serve static images with CORS headers
+app.use('/api/icons/image', express.static(path.join(__dirname, 'icons'), {
+  setHeaders: (res) => {
+    res.set('Access-Control-Allow-Origin', '*');
+  }
+}));
+
 // parse json request bodies
 app.use(express.json());
 
