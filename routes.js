@@ -717,7 +717,7 @@ router.get("/icons/today", async (req, res) => {
     res.json({
       filename: selectedImage,
       name: name,
-      imageUrl: `http://46.101.183.214:3001/api/icons/image/${selectedImage}`
+      imageUrl: `https://api.raiderdle.com/api/icons/image/${selectedImage}`
     });
   } catch (err) {
     console.error("Error in /icons/today:", err);
