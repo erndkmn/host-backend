@@ -7,7 +7,7 @@ const PORT = 8080;
 
 // allow frontend to call your backend
 app.use(cors({
-  origin: ['https://raiderdle.com', 'https://www.raiderdle.com', 'https://host-3yl.pages.dev', 'https://erndkmn.github.io/host/'],
+  origin: ['https://raiderdle.com', 'https://www.raiderdle.com', 'https://host-3yl.pages.dev'],
   credentials: true, // Erlaubt Cookies/Auth-Header, falls du sie später brauchst
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
