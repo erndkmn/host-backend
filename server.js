@@ -1,6 +1,12 @@
 import express from "express";
 import cors from "cors";
 import metaforgeRouter from "./routes.js";
+import path from "path";
+import { fileURLToPath } from "url";
+
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = 8080;
@@ -19,6 +25,28 @@ app.use(express.json());
 
 // VERY IMPORTANT for preflight
 app.options('*', cors());
+
+
+// Serve icons with CORS headers
+app.use(
+  "/api/icons/image",
+  (req, res, next) => {
+    res.setHeader(
+      "Access-Control-Allow-Origin",
+      "https://raiderdle.com"
+    );
+    res.setHeader(
+      "Access-Control-Allow-Origin",
+      "https://www.raiderdle.com"
+    );
+    res.setHeader(
+      "Access-Control-Allow-Origin",
+      "https://host-3yl.pages.dev"
+    );
+    next();
+  },
+  express.static(path.join(__dirname, "icons"))
+);
 
 // mount your router
 app.use("/api", metaforgeRouter);
