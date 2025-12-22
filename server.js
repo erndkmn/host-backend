@@ -27,22 +27,10 @@ app.use(express.json());
 app.options('*', cors());
 
 
-// Serve icons with CORS headers
 app.use(
   "/api/icons/image",
   (req, res, next) => {
-    res.setHeader(
-      "Access-Control-Allow-Origin",
-      "https://raiderdle.com"
-    );
-    res.setHeader(
-      "Access-Control-Allow-Origin",
-      "https://www.raiderdle.com"
-    );
-    res.setHeader(
-      "Access-Control-Allow-Origin",
-      "https://host-3yl.pages.dev"
-    );
+    res.setHeader("Access-Control-Allow-Origin", "*");
     next();
   },
   express.static(path.join(__dirname, "icons"))
