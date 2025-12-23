@@ -341,6 +341,67 @@ router.get("/weapons/today", async (req, res) => {
 });
 
 // Get all arcs (AFTER /arcs/today)
+let allArcsCache = null;
+const arcCacheNew = {};
+// Test route: get today's arc using offset and allArcsCache
+router.get("/arcs/getTest", async (req, res) => {
+  try {
+    // Get timezone offset from query parameter (in minutes)
+    const timezoneOffset = parseInt(req.query.offset) || 0;
+    // Calculate user's local date
+    const now = new Date();
+    const userLocalTime = new Date(now.getTime() + timezoneOffset * 60000);
+    const year = userLocalTime.getUTCFullYear();
+    const month = userLocalTime.getUTCMonth() + 1;
+    const day = userLocalTime.getUTCDate();
+    const dateKey = `${year}-${month}-${day}`;
+
+    // Check if allArcsCache is populated
+    if (!allArcsCache || !Array.isArray(allArcsCache) || allArcsCache.length === 0) {
+      return res.status(503).json({ error: "allArcsCache not populated yet" });
+    }
+
+    // Check cache for today's arc
+    const cacheKey = `arc-getTest-${dateKey}`;
+    const cached = arcCacheNew[cacheKey];
+    if (cached && Date.now() < cached.expiry) {
+      return res.json(cached.data);
+    }
+
+    // Seed RNG with date
+    const seed = `${year}${month}${day}`;
+    const rng = seedrandom(seed);
+    // Pick random arc
+    const index = Math.floor(rng() * allArcsCache.length);
+    const todaysArc = allArcsCache[index];
+
+    // Prepare response
+    const responseObj = {
+      allArcs: allArcsCache,
+      today: {
+        name: todaysArc?.name || "",
+        imgUrl: todaysArc?.image || ""
+      }
+    };
+
+    // Calculate expiry: next local midnight for the user's timezone
+    const nextMidnight = new Date(userLocalTime);
+    nextMidnight.setUTCHours(0, 0, 0, 0);
+    nextMidnight.setUTCDate(nextMidnight.getUTCDate() + 1);
+    const expiry = nextMidnight.getTime();
+
+    // Store in cache
+    arcCacheNew[cacheKey] = {
+      data: responseObj,
+      expiry: expiry,
+    };
+
+    res.json(responseObj);
+  } catch (err) {
+    console.error("Error in /arcs/getTest:", err);
+    res.status(500).json({ error: "Failed to get test arc", details: err.message });
+  }
+});
 router.get("/arcs", async (req, res) => {
   try {
     let page = 1;
@@ -359,10 +420,14 @@ router.get("/arcs", async (req, res) => {
     }
 
     res.json(results);
+    allArcsCache = results;
   } catch (err) {
     res.status(500).json({ error: "Failed to pull items", details: err });
   }
 });
+
+
+
 
 // Get all items (AFTER /items/today)
 router.get("/items", async (req, res) => {
