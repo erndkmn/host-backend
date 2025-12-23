@@ -391,93 +391,154 @@ router.get("/items", async (req, res) => {
 // Get all arcs with today's arc (AFTER /arcs/today, BEFORE /arcs)
 router.get("/arcsNew/today", async (req, res) => {
   try {
-    // Frontend sends local date like "2025-01-15"
-    const { date } = req.query;
+    // Get timezone offset from query parameter (in minutes)
+    const timezoneOffset = parseInt(req.query.offset) || 0;
 
-    if (!date) {
-      return res.status(400).json({ error: "Missing date" });
+    // Calculate user's local date
+    const now = new Date();
+    const userLocalTime = new Date(now.getTime() + timezoneOffset * 60000);
+
+    const year = userLocalTime.getUTCFullYear();
+    const month = userLocalTime.getUTCMonth() + 1;
+    const day = userLocalTime.getUTCDate();
+    const dateKey = `${year}-${month}-${day}`;
+
+    const cacheKey = `arcsNew-today-${dateKey}-offset-${timezoneOffset}`;
+
+    // Check cache
+    const cached = arcsNewTodayCache[cacheKey];
+    if (cached && Date.now() < cached.expiry) {
+      // Serve from cache
+      return res.json(cached.data);
     }
+    console.log("1");
 
-    // Load game state
+    // Calculate expiry: next local midnight for the user's timezone
+    const nextMidnight = new Date(userLocalTime);
+    nextMidnight.setUTCHours(0, 0, 0, 0); // Set to local midnight
+    nextMidnight.setUTCDate(nextMidnight.getUTCDate() + 1); // Move to next day
+    const expiry = nextMidnight.getTime();
+
+    console.log(`Requesting Arc for date: ${dateKey} (offset: ${timezoneOffset})`);
+
+    // 1. Load State
     let state = await getGameState();
+    let todaysSelection = state.history[dateKey];
 
-    // Load cached arcs
-    const allArcs = await getAllArcs();
+    // Fetch ALL arcs with pagination (and filter for valid images)
+    let page = 1;
+    let allArcs = [];
+    let hasNext = true;
+    while (hasNext) {
+      const url = `${BASE}/arcs?page=${page}&limit=100`;
+      const response = await fetch(url);
+      const data = await response.json();
+      // Only keep arcs with a valid image
+      const validArcs = data.data.filter(a => a.image && a.image.trim() !== "");
+      allArcs.push(...validArcs);
+      hasNext = data.pagination?.hasNextPage;
+      page++;
+      if (page > 100) break;
+    }
+    console.log(`Total arcs fetched for arcsNew: ${allArcs.length}`);
 
-    // Ensure ID pools exist
-    if (!state.availableIds || !state.shownIds) {
-      state.availableIds = allArcs.map((a) => a.id);
-      state.shownIds = [];
-      state.history = {};
+    // FIX: Check if the saved selection is invalid (empty image). If so, force re-selection.
+    if (
+      todaysSelection &&
+      (!todaysSelection.image || todaysSelection.image.trim() === "")
+    ) {
+      console.log(
+        `Invalid selection found for ${dateKey} (no image). Re-rolling...`
+      );
+      todaysSelection = null;
     }
 
-    let todaysSelection = state.history[date];
+    // 2. If no selection for this date, run rotation logic
+    if (!todaysSelection) {
+      console.log("No valid Arc selected for today. Running rotation logic...");
 
-    // If invalid or missing → generate ONCE
-    if (
-      !todaysSelection ||
-      !todaysSelection.image ||
-      todaysSelection.image.trim() === ""
-    ) {
-      console.log(`Selecting new arc for ${date}`);
+      // Initialize availableIds if brand new
+      if (state.availableIds.length === 0 && state.shownIds.length === 0) {
+        console.log("Initializing ID pool...");
+        state.availableIds = allArcs.map((a) => a.id);
+      }
 
+      // Reset pool if empty
       if (state.availableIds.length === 0) {
+        console.log("Available pool empty. Resetting from shown pool.");
         state.availableIds = [...state.shownIds];
         state.shownIds = [];
       }
 
+      // Pick random ID and ensure it exists in the valid list
+      let selectedId;
       let selectedArc;
-      let selectedIndex;
 
+      // Safety loop to find a valid ID
       while (!selectedArc && state.availableIds.length > 0) {
-        selectedIndex = Math.floor(
+        const randomIndex = Math.floor(
           Math.random() * state.availableIds.length
         );
-        const candidateId = state.availableIds[selectedIndex];
+        const candidateId = state.availableIds[randomIndex];
+
+        // Check if this ID actually has an image (exists in our filtered allArcs)
         selectedArc = allArcs.find((a) => a.id === candidateId);
 
-        if (!selectedArc) {
-          state.availableIds.splice(selectedIndex, 1);
+        if (selectedArc) {
+          selectedId = candidateId;
+          // Move ID: available -> shown
+          state.availableIds.splice(randomIndex, 1);
+          state.shownIds.push(selectedId);
+        } else {
+          // ID is in pool but has no image in API (like bombardier). Remove it and try again.
+          console.log(`Skipping ID without image: ${candidateId}`);
+          state.availableIds.splice(randomIndex, 1);
         }
       }
 
       if (!selectedArc) {
-        throw new Error("No valid arcs available");
+        // Fallback if everything fails (should not happen)
+        throw new Error("No valid arcs with images found available.");
       }
 
-      state.availableIds.splice(selectedIndex, 1);
-      state.shownIds.push(selectedArc.id);
+      // Save to history
+      todaysSelection = { id: selectedId, image: selectedArc.image };
+      state.history[dateKey] = todaysSelection;
 
-      todaysSelection = {
-        id: selectedArc.id,
-        image: selectedArc.image
-      };
-
-      state.history[date] = todaysSelection;
       await saveGameState(state);
+      console.log(`New Arc selected: ${selectedId}`);
+    } else {
+      console.log(`Returning cached Arc: ${todaysSelection.id}`);
     }
 
-    const todaysArc = allArcs.find(
-      (a) => a.id === todaysSelection.id
-    );
+    // Find today's arc in allArcs for full info
+    const todaysArc = allArcs.find(a => a.id === todaysSelection.id);
 
-    res.json({
-      allArcs: allArcs.map((a) => ({
-        id: a.id,
-        name: a.name,
-        icon: a.icon
-      })),
+    // Create response in requested format
+    const responseObj = {
+      allArcs: allArcs,
       today: {
         name: todaysArc?.name || "",
-        imgUrl: todaysArc?.image || ""
-      }
-    });
+        imgUrl: todaysArc?.image || "",
+      },
+    };
+
+
+    // Store in cache with expiry at next local midnight
+    arcsNewTodayCache[cacheKey] = {
+      data: responseObj,
+      expiry: expiry,
+    };
+
+    res.json(responseObj);
   } catch (err) {
-    console.error("arcsNew/today failed:", err);
-    res.status(500).json({ error: "Internal server error" });
+    console.error("Error in /arcsNew/today:", err);
+    res.status(500).json({
+      error: "Failed to fetch arcs",
+      details: err.message,
+    });
   }
 });
-
 
 // Get all weapons with today's weapon (BEFORE /weapons)
 router.get("/weaponsNew/today", async (req, res) => {
