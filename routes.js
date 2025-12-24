@@ -747,9 +747,9 @@ router.get("/icons/today", async (req, res) => {
     const now = new Date();
     const userLocalTime = new Date(now.getTime() + timezoneOffset * 60000);
     
-    const year = userLocalTime.getUTCFullYear();
-    const month = userLocalTime.getUTCMonth() + 1;
-    const day = userLocalTime.getUTCDate();
+    const year = userLocalTime.getFullYear();
+    const month = userLocalTime.getMonth() + 1;
+    const day = userLocalTime.getDate();
     const seed = `icons${year}${month}${day}`;
     const rng = seedrandom(seed);
 
