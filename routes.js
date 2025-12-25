@@ -3,6 +3,7 @@ const itemsTodayCache = {};
 // Simple in-memory cache for /weaponsNew/today
 const weaponsNewTodayCache = {};
 
+import { pool } from "./db.js";
 import express from "express";
 import fetch from "node-fetch";
 import seedrandom from "seedrandom";
@@ -831,19 +832,22 @@ router.post('/api/bug-report', async (req, res) => {
     return res.status(400).json({ error: 'Invalid payload' });
   }
 
-  try {
-    await pool.query(
-      `INSERT INTO bug_reports (message, modes)
-       VALUES ($1, $2)`,
-      [message, modes]
-    );
-
-    res.json({ ok: true });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'DB error' });
-  }
-});
+    // POST /api/bug-report: Save bug report to database
+    try {
+      // Insert bug report into the database
+      const insertQuery = `
+        INSERT INTO bug_reports (message, modes, created_at)
+        VALUES ($1, $2, NOW())
+        RETURNING id;
+      `;
+      // Store modes as JSON array
+      const result = await pool.query(insertQuery, [message, JSON.stringify(modes)]);
+      res.status(201).json({ success: true, id: result.rows[0].id });
+    } catch (err) {
+      console.error("Error saving bug report:", err);
+      res.status(500).json({ error: "Failed to save bug report." });
+    }
+  });
 
 
 export default router;
