@@ -10,7 +10,6 @@ const bugLimiter = rateLimit({
   max: 5,
 });
 
-app.post('/api/bug-report', bugLimiter, handler);
 
 
 
@@ -47,6 +46,7 @@ app.use(
 
 // mount your router
 app.use("/api", metaforgeRouter);
+app.post('/api/bug-report', bugLimiter, handler);
 
 // start the server
 app.listen(PORT, () => {
