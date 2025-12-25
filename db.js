@@ -5,6 +5,6 @@ export const pool = new Pool({
   host: 'localhost',
   user: 'raider_user',
   password: 'raiderdle6438',
-  database: 'raiderdle',
+  database: 'bugs',
   port: 5432,
 });
