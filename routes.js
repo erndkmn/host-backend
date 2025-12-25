@@ -825,7 +825,7 @@ router.get("/icons/image/:filename", async (req, res) => {
 });
 
 
-router.post('/api/bug-report', async (req, res) => {
+router.post('/bug-report', async (req, res) => {
   const { message, modes } = req.body;
 
   if (!message || !modes?.length) {
