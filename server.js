@@ -3,6 +3,15 @@ import cors from "cors";
 import metaforgeRouter from "./routes.js";
 import path from "path";
 import { fileURLToPath } from "url";
+import rateLimit from 'express-rate-limit';
+
+const bugLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+});
+
+app.post('/api/bug-report', bugLimiter, handler);
+
 
 
 const __filename = fileURLToPath(import.meta.url);

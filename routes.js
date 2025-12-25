@@ -823,4 +823,27 @@ router.get("/icons/image/:filename", async (req, res) => {
   }
 });
 
+
+app.post('/api/bug-report', async (req, res) => {
+  const { message, modes } = req.body;
+
+  if (!message || !modes?.length) {
+    return res.status(400).json({ error: 'Invalid payload' });
+  }
+
+  try {
+    await pool.query(
+      `INSERT INTO bug_reports (message, modes)
+       VALUES ($1, $2)`,
+      [message, modes]
+    );
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'DB error' });
+  }
+});
+
+
 export default router;
