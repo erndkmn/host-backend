@@ -841,7 +841,7 @@ router.post('/bug-report', async (req, res) => {
         RETURNING id;
       `;
       // Store modes as JSON array
-      const result = await pool.query(insertQuery, [message, JSON.stringify(modes)]);
+      const result = await pool.query(insertQuery, [message, modes]);
       res.status(201).json({ success: true, id: result.rows[0].id });
     } catch (err) {
       console.error("Error saving bug report:", err);
