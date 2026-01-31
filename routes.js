@@ -850,4 +850,69 @@ router.post('/bug-report', async (req, res) => {
   });
 
 
+  // GET /api/mapguesser/maps - Return all unique maps
+app.get('/api/mapguesser/maps', (req, res) => {
+  const files = fs.readdirSync(SCREENSHOTS_DIR);
+  
+  // Extract unique map names from filenames (e.g., "bank_1.png" → "bank")
+  const mapNames = [...new Set(
+    files
+      .filter(f => f.endsWith('.png') || f.endsWith('.jpg'))
+      .map(f => f.split('_')[0]) // Get map name before underscore
+  )];
+  
+  const maps = mapNames.map(name => ({
+    id: name,
+    name: name.charAt(0).toUpperCase() + name.slice(1), // Capitalize
+    icon: `/api/mapguesser/icon/${name}` // Or a default icon path
+  }));
+  
+  res.json({ maps });
+});
+
+// GET /api/mapguesser/random?count=3 - Return random snippets from a random map
+app.get('/api/mapguesser/random', (req, res) => {
+  const count = parseInt(req.query.count) || 2;
+  const files = fs.readdirSync(SCREENSHOTS_DIR);
+  
+  // Get all unique map names
+  const mapNames = [...new Set(
+    files
+      .filter(f => f.endsWith('.png') || f.endsWith('.jpg'))
+      .map(f => f.split('_')[0])
+  )];
+  
+  // Pick a random map
+  const randomMap = mapNames[Math.floor(Math.random() * mapNames.length)];
+  
+  // Get all screenshots for this map
+  const mapScreenshots = files.filter(f => f.startsWith(randomMap + '_'));
+  
+  // Shuffle and pick 'count' random screenshots
+  const shuffled = mapScreenshots.sort(() => Math.random() - 0.5);
+  const selectedSnippets = shuffled.slice(0, Math.min(count, shuffled.length));
+  
+  const snippets = selectedSnippets.map((filename, i) => ({
+    id: `${randomMap}_${i}`,
+    url: `${req.protocol}://${req.get('host')}/api/mapguesser/image/${filename}`
+  }));
+  
+  res.json({
+    mapName: randomMap.charAt(0).toUpperCase() + randomMap.slice(1),
+    snippets
+  });
+});
+
+// GET /api/mapguesser/image/:filename - Serve the actual image
+app.get('/api/mapguesser/image/:filename', (req, res) => {
+  const filePath = path.join(SCREENSHOTS_DIR, req.params.filename);
+  
+  if (fs.existsSync(filePath)) {
+    res.sendFile(path.resolve(filePath));
+  } else {
+    res.status(404).json({ error: 'Image not found' });
+  }
+});
+
+
 export default router;
