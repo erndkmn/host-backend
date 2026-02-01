@@ -9,6 +9,7 @@ import fetch from "node-fetch";
 import seedrandom from "seedrandom";
 import sharp from "sharp";
 import fs from "fs/promises";
+import fsSync from "fs";
 import path from "path";
 
 // Simple in-memory cache for /arcsNew/today
@@ -871,7 +872,7 @@ router.post('/bug-report', async (req, res) => {
 // GET /api/mapguesser/maps - Returns all available map names for the search bar
 router.get('/mapguesser/maps', (req, res) => {
   try {
-    const files = fs.readdirSync(SCREENSHOTS_DIR);
+    const files = fsSync.readdirSync(SCREENSHOTS_DIR);
     const mapNames = [...new Set(
       files.filter(f => /\.(png|jpg|jpeg)$/i.test(f))
            .map(f => f.replace(/[-_]\d+\.(png|jpg|jpeg)$/i, ''))
@@ -895,7 +896,7 @@ router.get('/mapguesser/random', async (req, res) => {
   const count = Math.min(parseInt(req.query.count) || 2, 3);
   const difficulty = req.query.difficulty || 'medium';
   
-  const files = fs.readdirSync(SCREENSHOTS_DIR)
+  const files = fsSync.readdirSync(SCREENSHOTS_DIR)
     .filter(f => /\.(png|jpg|jpeg)$/i.test(f));
   
   // Get unique map names
@@ -936,7 +937,7 @@ router.get('/mapguesser/snippet/:filename', async (req, res) => {
     const { seed, difficulty = 'medium' } = req.query;
     
     const filePath = path.join(SCREENSHOTS_DIR, filename);
-    if (!fs.existsSync(filePath)) {
+    if (!fsSync.existsSync(filePath)) {
       return res.status(404).json({ error: 'Image not found' });
     }
     
