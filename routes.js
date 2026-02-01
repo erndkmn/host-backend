@@ -868,25 +868,30 @@ router.post('/bug-report', async (req, res) => {
   });
 
 
-// GET /api/mapguesser/maps
-app.get('/api/mapguesser/maps', (req, res) => {
-  const files = fs.readdirSync(SCREENSHOTS_DIR);
-  const mapNames = [...new Set(
-    files.filter(f => /\.(png|jpg|jpeg)$/i.test(f))
-         .map(f => f.replace(/[-_]\d+\.(png|jpg|jpeg)$/i, ''))
-  )];
-  
-  const maps = mapNames.map(name => ({
-    id: name.toLowerCase().replace(/\s+/g, '-'),
-    name: name.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
-    icon: `/api/mapguesser/icon/${name}`
-  }));
-  
-  res.json({ maps });
+// GET /api/mapguesser/maps - Returns all available map names for the search bar
+router.get('/mapguesser/maps', (req, res) => {
+  try {
+    const files = fs.readdirSync(SCREENSHOTS_DIR);
+    const mapNames = [...new Set(
+      files.filter(f => /\.(png|jpg|jpeg)$/i.test(f))
+           .map(f => f.replace(/[-_]\d+\.(png|jpg|jpeg)$/i, ''))
+    )];
+    
+    const maps = mapNames.map(name => ({
+      id: name.toLowerCase().replace(/\s+/g, '-'),
+      name: name.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+      icon: `/api/mapguesser/icon/${name}`
+    }));
+    
+    res.json({ maps });
+  } catch (err) {
+    console.error('Error fetching maps:', err);
+    res.status(500).json({ error: 'Failed to fetch maps', details: err.message });
+  }
 });
 
 // GET /api/mapguesser/random?count=2&difficulty=medium
-app.get('/api/mapguesser/random', async (req, res) => {
+router.get('/mapguesser/random', async (req, res) => {
   const count = Math.min(parseInt(req.query.count) || 2, 3);
   const difficulty = req.query.difficulty || 'medium';
   
@@ -925,7 +930,7 @@ app.get('/api/mapguesser/random', async (req, res) => {
 });
 
 // GET /api/mapguesser/snippet/:filename - Serve cropped, compressed snippet
-app.get('/api/mapguesser/snippet/:filename', async (req, res) => {
+router.get('/mapguesser/snippet/:filename', async (req, res) => {
   try {
     const { filename } = req.params;
     const { seed, difficulty = 'medium' } = req.query;
