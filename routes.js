@@ -19,6 +19,24 @@ const router = express.Router();
 const BASE = "https://metaforge.app/api/arc-raiders";
 const STATE_FILE = path.resolve("./gameState.json");
 
+
+const SCREENSHOTS_DIR = './screenshots';
+
+// HUD margins (percentage of image to exclude)
+const HUD_MARGINS = {
+  top: 0.10,      // 10% from top
+  bottom: 0.15,   // 15% from bottom
+  left: 0.05,     // 5% from left
+  right: 0.05     // 5% from right
+};
+
+// Snippet size based on difficulty
+const SNIPPET_SIZES = {
+  hard: { width: 200, height: 200 },    // Small crop = harder
+  medium: { width: 300, height: 300 },  // Medium crop
+  easy: { width: 400, height: 400 }     // Larger crop = easier
+};
+
 // Helper to load game state
 async function getGameState() {
   try {
@@ -850,67 +868,130 @@ router.post('/bug-report', async (req, res) => {
   });
 
 
-  // GET /api/mapguesser/maps - Return all unique maps
+// GET /api/mapguesser/maps
 app.get('/api/mapguesser/maps', (req, res) => {
   const files = fs.readdirSync(SCREENSHOTS_DIR);
-  
-  // Extract unique map names from filenames (e.g., "bank_1.png" → "bank")
   const mapNames = [...new Set(
-    files
-      .filter(f => f.endsWith('.png') || f.endsWith('.jpg'))
-      .map(f => f.split('_')[0]) // Get map name before underscore
+    files.filter(f => /\.(png|jpg|jpeg)$/i.test(f))
+         .map(f => f.replace(/[-_]\d+\.(png|jpg|jpeg)$/i, ''))
   )];
   
   const maps = mapNames.map(name => ({
-    id: name,
-    name: name.charAt(0).toUpperCase() + name.slice(1), // Capitalize
-    icon: `/api/mapguesser/icon/${name}` // Or a default icon path
+    id: name.toLowerCase().replace(/\s+/g, '-'),
+    name: name.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+    icon: `/api/mapguesser/icon/${name}`
   }));
   
   res.json({ maps });
 });
 
-// GET /api/mapguesser/random?count=3 - Return random snippets from a random map
-app.get('/api/mapguesser/random', (req, res) => {
-  const count = parseInt(req.query.count) || 2;
-  const files = fs.readdirSync(SCREENSHOTS_DIR);
+// GET /api/mapguesser/random?count=2&difficulty=medium
+app.get('/api/mapguesser/random', async (req, res) => {
+  const count = Math.min(parseInt(req.query.count) || 2, 3);
+  const difficulty = req.query.difficulty || 'medium';
   
-  // Get all unique map names
+  const files = fs.readdirSync(SCREENSHOTS_DIR)
+    .filter(f => /\.(png|jpg|jpeg)$/i.test(f));
+  
+  // Get unique map names
   const mapNames = [...new Set(
-    files
-      .filter(f => f.endsWith('.png') || f.endsWith('.jpg'))
-      .map(f => f.split('_')[0])
+    files.map(f => f.replace(/[-_]\d+\.(png|jpg|jpeg)$/i, ''))
   )];
   
-  // Pick a random map
+  // Pick random map
   const randomMap = mapNames[Math.floor(Math.random() * mapNames.length)];
   
   // Get all screenshots for this map
-  const mapScreenshots = files.filter(f => f.startsWith(randomMap + '_'));
+  const mapFiles = files.filter(f => f.startsWith(randomMap));
   
-  // Shuffle and pick 'count' random screenshots
-  const shuffled = mapScreenshots.sort(() => Math.random() - 0.5);
-  const selectedSnippets = shuffled.slice(0, Math.min(count, shuffled.length));
+  // Pick random screenshots
+  const shuffled = mapFiles.sort(() => Math.random() - 0.5);
+  const selectedFiles = shuffled.slice(0, count);
   
-  const snippets = selectedSnippets.map((filename, i) => ({
-    id: `${randomMap}_${i}`,
-    url: `${req.protocol}://${req.get('host')}/api/mapguesser/image/${filename}`
-  }));
+  // Generate unique snippet IDs with random crop positions
+  const snippets = selectedFiles.map((file, i) => {
+    const snippetId = `${Date.now()}-${i}-${Math.random().toString(36).substr(2, 9)}`;
+    return {
+      id: snippetId,
+      // Include crop seed in URL for reproducible crops
+      url: `/api/mapguesser/snippet/${file}?seed=${snippetId}&difficulty=${difficulty}`
+    };
+  });
   
   res.json({
-    mapName: randomMap.charAt(0).toUpperCase() + randomMap.slice(1),
+    mapName: randomMap.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
     snippets
   });
 });
 
-// GET /api/mapguesser/image/:filename - Serve the actual image
-app.get('/api/mapguesser/image/:filename', (req, res) => {
-  const filePath = path.join(SCREENSHOTS_DIR, req.params.filename);
-  
-  if (fs.existsSync(filePath)) {
-    res.sendFile(path.resolve(filePath));
-  } else {
-    res.status(404).json({ error: 'Image not found' });
+// GET /api/mapguesser/snippet/:filename - Serve cropped, compressed snippet
+app.get('/api/mapguesser/snippet/:filename', async (req, res) => {
+  try {
+    const { filename } = req.params;
+    const { seed, difficulty = 'medium' } = req.query;
+    
+    const filePath = path.join(SCREENSHOTS_DIR, filename);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Image not found' });
+    }
+    
+    // Get image metadata
+    const image = sharp(filePath);
+    const metadata = await image.metadata();
+    const { width, height } = metadata;
+    
+    // Calculate safe zone (excluding HUD)
+    const safeZone = {
+      left: Math.floor(width * HUD_MARGINS.left),
+      top: Math.floor(height * HUD_MARGINS.top),
+      right: Math.floor(width * (1 - HUD_MARGINS.right)),
+      bottom: Math.floor(height * (1 - HUD_MARGINS.bottom))
+    };
+    
+    const safeWidth = safeZone.right - safeZone.left;
+    const safeHeight = safeZone.bottom - safeZone.top;
+    
+    // Get snippet size for difficulty
+    const snippetSize = SNIPPET_SIZES[difficulty] || SNIPPET_SIZES.medium;
+    
+    // Use seed to generate consistent random position
+    const seededRandom = (seed) => {
+      let hash = 0;
+      for (let i = 0; i < seed.length; i++) {
+        hash = ((hash << 5) - hash) + seed.charCodeAt(i);
+        hash |= 0;
+      }
+      return Math.abs(hash % 1000) / 1000;
+    };
+    
+    // Random position within safe zone
+    const maxX = safeWidth - snippetSize.width;
+    const maxY = safeHeight - snippetSize.height;
+    
+    const cropX = safeZone.left + Math.floor(seededRandom(seed + 'x') * maxX);
+    const cropY = safeZone.top + Math.floor(seededRandom(seed + 'y') * maxY);
+    
+    // Crop and compress
+    const croppedImage = await sharp(filePath)
+      .extract({
+        left: cropX,
+        top: cropY,
+        width: snippetSize.width,
+        height: snippetSize.height
+      })
+      .webp({ quality: 80 }) // WebP is much smaller than PNG!
+      .toBuffer();
+    
+    // Cache headers for performance
+    res.set({
+      'Content-Type': 'image/webp',
+      'Cache-Control': 'public, max-age=3600' // Cache for 1 hour
+    });
+    
+    res.send(croppedImage);
+  } catch (err) {
+    console.error('Error generating snippet:', err);
+    res.status(500).json({ error: 'Failed to generate snippet' });
   }
 });
 
