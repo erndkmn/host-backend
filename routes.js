@@ -874,8 +874,8 @@ router.get('/mapguesser/maps', (req, res) => {
   try {
     const files = fsSync.readdirSync(SCREENSHOTS_DIR);
     const mapNames = [...new Set(
-      files.filter(f => /\.(png|jpg|jpeg)$/i.test(f))
-           .map(f => f.replace(/[-_]\d+\.(png|jpg|jpeg)$/i, ''))
+      files.filter(f => /\.(png|jpg|jpeg|webp)$/i.test(f))
+           .map(f => f.replace(/[-_]\d+\.(png|jpg|jpeg|webp)$/i, ''))
     )];
     
     const maps = mapNames.map(name => ({
@@ -897,11 +897,11 @@ router.get('/mapguesser/random', async (req, res) => {
   const difficulty = req.query.difficulty || 'medium';
   
   const files = fsSync.readdirSync(SCREENSHOTS_DIR)
-    .filter(f => /\.(png|jpg|jpeg)$/i.test(f));
+    .filter(f => /\.(png|jpg|jpeg|webp)$/i.test(f));
   
   // Get unique map names
   const mapNames = [...new Set(
-    files.map(f => f.replace(/[-_]\d+\.(png|jpg|jpeg)$/i, ''))
+    files.map(f => f.replace(/[-_]\d+\.(png|jpg|jpeg|webp)$/i, ''))
   )];
   
   // Pick random map
