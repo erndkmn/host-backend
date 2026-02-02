@@ -12,6 +12,13 @@ import fs from "fs/promises";
 import fsSync from "fs";
 import path from "path";
 
+// Load wordle words
+const wordsData = JSON.parse(fsSync.readFileSync('./words.json', 'utf8'));
+const WORDLE_WORDS = wordsData.words.filter(w => w.length === 5).map(w => w.toUpperCase());
+
+// Simple in-memory cache for wordle
+const wordleTodayCache = {};
+
 // Simple in-memory cache for /arcsNew/today
 const arcsNewTodayCache = {};
 // TTL will be calculated dynamically to expire at next local midnight
@@ -840,6 +847,163 @@ router.get("/icons/image/:filename", async (req, res) => {
   } catch (err) {
     console.error("Error serving icon:", err);
     res.status(500).json({ error: "Failed to serve icon" });
+  }
+});
+
+// ============ WORDLE ROUTES ============
+
+// Get today's wordle word
+router.get("/wordle/today", async (req, res) => {
+  try {
+    const timezoneOffset = parseInt(req.query.offset) || 0;
+    const now = new Date();
+    const userLocalTime = new Date(now.getTime() + timezoneOffset * 60000);
+    
+    const year = userLocalTime.getUTCFullYear();
+    const month = userLocalTime.getUTCMonth() + 1;
+    const day = userLocalTime.getUTCDate();
+    const dateKey = `${year}-${month}-${day}`;
+    
+    // Check cache
+    if (wordleTodayCache[dateKey]) {
+      console.log(`Returning cached wordle word for ${dateKey}`);
+      return res.json(wordleTodayCache[dateKey]);
+    }
+    
+    // Generate deterministic word for today
+    const seed = `wordle${year}${month}${day}`;
+    const rng = seedrandom(seed);
+    
+    if (WORDLE_WORDS.length === 0) {
+      return res.status(500).json({ error: "No valid 5-letter words found" });
+    }
+    
+    const index = Math.floor(rng() * WORDLE_WORDS.length);
+    const todayWord = WORDLE_WORDS[index];
+    
+    console.log(`Today's wordle word (${dateKey}): ${todayWord}`);
+    
+    // Cache the result
+    const result = {
+      wordLength: todayWord.length,
+      // Don't send the actual word - the frontend will validate guesses via the check route
+    };
+    wordleTodayCache[dateKey] = result;
+    
+    res.json(result);
+  } catch (err) {
+    console.error("Error in /wordle/today:", err);
+    res.status(500).json({ error: "Failed to get daily wordle" });
+  }
+});
+
+// Check a wordle guess
+router.post("/wordle/check", async (req, res) => {
+  try {
+    const { guess } = req.body;
+    const timezoneOffset = parseInt(req.query.offset) || 0;
+    
+    if (!guess || typeof guess !== 'string') {
+      return res.status(400).json({ error: "Invalid guess" });
+    }
+    
+    const normalizedGuess = guess.toUpperCase().trim();
+    
+    if (normalizedGuess.length !== 5) {
+      return res.status(400).json({ error: "Guess must be 5 letters" });
+    }
+    
+    // Get today's word
+    const now = new Date();
+    const userLocalTime = new Date(now.getTime() + timezoneOffset * 60000);
+    
+    const year = userLocalTime.getUTCFullYear();
+    const month = userLocalTime.getUTCMonth() + 1;
+    const day = userLocalTime.getUTCDate();
+    
+    const seed = `wordle${year}${month}${day}`;
+    const rng = seedrandom(seed);
+    const index = Math.floor(rng() * WORDLE_WORDS.length);
+    const todayWord = WORDLE_WORDS[index];
+    
+    // Calculate result for each letter
+    // 'correct' = right letter, right position (green)
+    // 'present' = right letter, wrong position (yellow)
+    // 'absent' = letter not in word (gray)
+    const result = [];
+    const wordLetters = todayWord.split('');
+    const guessLetters = normalizedGuess.split('');
+    const letterCounts = {};
+    
+    // Count letters in the target word
+    for (const letter of wordLetters) {
+      letterCounts[letter] = (letterCounts[letter] || 0) + 1;
+    }
+    
+    // First pass: mark correct positions (green)
+    for (let i = 0; i < 5; i++) {
+      if (guessLetters[i] === wordLetters[i]) {
+        result[i] = { letter: guessLetters[i], status: 'correct' };
+        letterCounts[guessLetters[i]]--;
+      }
+    }
+    
+    // Second pass: mark present (yellow) or absent (gray)
+    for (let i = 0; i < 5; i++) {
+      if (result[i]) continue; // Already marked as correct
+      
+      if (letterCounts[guessLetters[i]] > 0) {
+        result[i] = { letter: guessLetters[i], status: 'present' };
+        letterCounts[guessLetters[i]]--;
+      } else {
+        result[i] = { letter: guessLetters[i], status: 'absent' };
+      }
+    }
+    
+    const isCorrect = normalizedGuess === todayWord;
+    
+    res.json({
+      result,
+      isCorrect,
+      // Only reveal the word if guessed correctly
+      ...(isCorrect && { word: todayWord })
+    });
+  } catch (err) {
+    console.error("Error in /wordle/check:", err);
+    res.status(500).json({ error: "Failed to check guess" });
+  }
+});
+
+// Get all valid wordle words (for validation)
+router.get("/wordle/words", async (req, res) => {
+  try {
+    res.json({ words: WORDLE_WORDS });
+  } catch (err) {
+    console.error("Error in /wordle/words:", err);
+    res.status(500).json({ error: "Failed to get words" });
+  }
+});
+
+// Reveal today's wordle word (for game over)
+router.get("/wordle/reveal", async (req, res) => {
+  try {
+    const timezoneOffset = parseInt(req.query.offset) || 0;
+    const now = new Date();
+    const userLocalTime = new Date(now.getTime() + timezoneOffset * 60000);
+    
+    const year = userLocalTime.getUTCFullYear();
+    const month = userLocalTime.getUTCMonth() + 1;
+    const day = userLocalTime.getUTCDate();
+    
+    const seed = `wordle${year}${month}${day}`;
+    const rng = seedrandom(seed);
+    const index = Math.floor(rng() * WORDLE_WORDS.length);
+    const todayWord = WORDLE_WORDS[index];
+    
+    res.json({ word: todayWord });
+  } catch (err) {
+    console.error("Error in /wordle/reveal:", err);
+    res.status(500).json({ error: "Failed to reveal word" });
   }
 });
 
