@@ -13,8 +13,17 @@ import fsSync from "fs";
 import path from "path";
 
 // Load wordle words
+// WORDLE_ANSWERS = possible correct answers (from words.json)
 const wordsData = JSON.parse(fsSync.readFileSync('./words.json', 'utf8'));
-const WORDLE_WORDS = wordsData.words.filter(w => w.length === 5).map(w => w.toUpperCase());
+const WORDLE_ANSWERS = wordsData.words.filter(w => w.length === 5).map(w => w.toUpperCase());
+
+// VALID_WORDLE_INPUTS = all accepted input guesses (from validInputWordle.txt)
+const validInputData = fsSync.readFileSync('./validInputWordle.txt', 'utf8');
+const VALID_WORDLE_INPUTS = new Set(
+  validInputData.split('\n').map(w => w.trim().toUpperCase()).filter(w => w.length === 5)
+);
+// Also include all answers as valid inputs
+WORDLE_ANSWERS.forEach(w => VALID_WORDLE_INPUTS.add(w));
 
 // Simple in-memory cache for wordle
 const wordleTodayCache = {};
@@ -874,12 +883,12 @@ router.get("/wordle/today", async (req, res) => {
     const seed = `wordle${year}${month}${day}`;
     const rng = seedrandom(seed);
     
-    if (WORDLE_WORDS.length === 0) {
+    if (WORDLE_ANSWERS.length === 0) {
       return res.status(500).json({ error: "No valid 5-letter words found" });
     }
     
-    const index = Math.floor(rng() * WORDLE_WORDS.length);
-    const todayWord = WORDLE_WORDS[index];
+    const index = Math.floor(rng() * WORDLE_ANSWERS.length);
+    const todayWord = WORDLE_ANSWERS[index];
     
     console.log(`Today's wordle word (${dateKey}): ${todayWord}`);
     
@@ -913,6 +922,11 @@ router.post("/wordle/check", async (req, res) => {
       return res.status(400).json({ error: "Guess must be 5 letters" });
     }
     
+    // Check if the guess is a valid word
+    if (!VALID_WORDLE_INPUTS.has(normalizedGuess)) {
+      return res.status(400).json({ error: "Not a valid word", isInvalidWord: true });
+    }
+    
     // Get today's word
     const now = new Date();
     const userLocalTime = new Date(now.getTime() + timezoneOffset * 60000);
@@ -923,8 +937,8 @@ router.post("/wordle/check", async (req, res) => {
     
     const seed = `wordle${year}${month}${day}`;
     const rng = seedrandom(seed);
-    const index = Math.floor(rng() * WORDLE_WORDS.length);
-    const todayWord = WORDLE_WORDS[index];
+    const index = Math.floor(rng() * WORDLE_ANSWERS.length);
+    const todayWord = WORDLE_ANSWERS[index];
     
     // Calculate result for each letter
     // 'correct' = right letter, right position (green)
@@ -974,10 +988,10 @@ router.post("/wordle/check", async (req, res) => {
   }
 });
 
-// Get all valid wordle words (for validation)
+// Get all valid wordle words (for client-side validation)
 router.get("/wordle/words", async (req, res) => {
   try {
-    res.json({ words: WORDLE_WORDS });
+    res.json({ words: Array.from(VALID_WORDLE_INPUTS) });
   } catch (err) {
     console.error("Error in /wordle/words:", err);
     res.status(500).json({ error: "Failed to get words" });
@@ -997,8 +1011,8 @@ router.get("/wordle/reveal", async (req, res) => {
     
     const seed = `wordle${year}${month}${day}`;
     const rng = seedrandom(seed);
-    const index = Math.floor(rng() * WORDLE_WORDS.length);
-    const todayWord = WORDLE_WORDS[index];
+    const index = Math.floor(rng() * WORDLE_ANSWERS.length);
+    const todayWord = WORDLE_ANSWERS[index];
     
     res.json({ word: todayWord });
   } catch (err) {
