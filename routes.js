@@ -1047,19 +1047,19 @@ router.post('/bug-report', async (req, res) => {
   });
 
 
-// GET /api/mapguesser/maps - Returns all available map names for the search bar
+// GET /api/mapguesser/maps - Returns all available map names from subfolders
 router.get('/mapguesser/maps', (req, res) => {
   try {
-    const files = fsSync.readdirSync(SCREENSHOTS_DIR);
-    const mapNames = [...new Set(
-      files.filter(f => /\.(png|jpg|jpeg|webp)$/i.test(f))
-           .map(f => f.replace(/[-_]\d+\.(png|jpg|jpeg|webp)$/i, ''))
-    )];
+    // Read all subdirectories in the screenshots folder
+    const entries = fsSync.readdirSync(SCREENSHOTS_DIR, { withFileTypes: true });
+    const mapFolders = entries
+      .filter(entry => entry.isDirectory())
+      .map(entry => entry.name);
     
-    const maps = mapNames.map(name => ({
-      id: name.toLowerCase().replace(/\s+/g, '-'),
-      name: name.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
-      icon: `/api/mapguesser/icon/${name}`
+    const maps = mapFolders.map(folderName => ({
+      id: folderName.toLowerCase().replace(/\s+/g, '-'),
+      name: folderName.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+      icon: `/api/mapguesser/icon/${folderName}`
     }));
     
     res.json({ maps });
@@ -1071,50 +1071,63 @@ router.get('/mapguesser/maps', (req, res) => {
 
 // GET /api/mapguesser/random?count=2&difficulty=medium
 router.get('/mapguesser/random', async (req, res) => {
-  const count = Math.min(parseInt(req.query.count) || 2, 3);
-  const difficulty = req.query.difficulty || 'medium';
-  
-  const files = fsSync.readdirSync(SCREENSHOTS_DIR)
-    .filter(f => /\.(png|jpg|jpeg|webp)$/i.test(f));
-  
-  // Get unique map names
-  const mapNames = [...new Set(
-    files.map(f => f.replace(/[-_]\d+\.(png|jpg|jpeg|webp)$/i, ''))
-  )];
-  
-  // Pick random map
-  const randomMap = mapNames[Math.floor(Math.random() * mapNames.length)];
-  
-  // Get all screenshots for this map
-  const mapFiles = files.filter(f => f.startsWith(randomMap));
-  
-  // Pick random screenshots
-  const shuffled = mapFiles.sort(() => Math.random() - 0.5);
-  const selectedFiles = shuffled.slice(0, count);
-  
-  // Generate unique snippet IDs with random crop positions
-  const snippets = selectedFiles.map((file, i) => {
-    const snippetId = `${Date.now()}-${i}-${Math.random().toString(36).substr(2, 9)}`;
-    return {
-      id: snippetId,
-      // Include crop seed in URL for reproducible crops
-      url: `/api/mapguesser/snippet/${file}?seed=${snippetId}&difficulty=${difficulty}`
-    };
-  });
-  
-  res.json({
-    mapName: randomMap.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
-    snippets
-  });
+  try {
+    const count = Math.min(parseInt(req.query.count) || 2, 3);
+    const difficulty = req.query.difficulty || 'medium';
+    
+    // Get all map subfolders
+    const entries = fsSync.readdirSync(SCREENSHOTS_DIR, { withFileTypes: true });
+    const mapFolders = entries
+      .filter(entry => entry.isDirectory())
+      .map(entry => entry.name);
+    
+    if (mapFolders.length === 0) {
+      return res.status(404).json({ error: 'No map folders found' });
+    }
+    
+    // Pick random map folder
+    const randomMap = mapFolders[Math.floor(Math.random() * mapFolders.length)];
+    const mapFolderPath = path.join(SCREENSHOTS_DIR, randomMap);
+    
+    // Get all screenshots in this map's folder
+    const files = fsSync.readdirSync(mapFolderPath)
+      .filter(f => /\.(png|jpg|jpeg|webp)$/i.test(f));
+    
+    if (files.length === 0) {
+      return res.status(404).json({ error: 'No screenshots found for this map' });
+    }
+    
+    // Pick random screenshots
+    const shuffled = files.sort(() => Math.random() - 0.5);
+    const selectedFiles = shuffled.slice(0, Math.min(count, files.length));
+    
+    // Generate unique snippet IDs with random crop positions
+    const snippets = selectedFiles.map((file, i) => {
+      const snippetId = `${Date.now()}-${i}-${Math.random().toString(36).substr(2, 9)}`;
+      return {
+        id: snippetId,
+        // Include map folder in URL path
+        url: `/api/mapguesser/snippet/${randomMap}/${file}?seed=${snippetId}&difficulty=${difficulty}`
+      };
+    });
+    
+    res.json({
+      mapName: randomMap.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+      snippets
+    });
+  } catch (err) {
+    console.error('Error fetching random map:', err);
+    res.status(500).json({ error: 'Failed to fetch random map', details: err.message });
+  }
 });
 
-// GET /api/mapguesser/snippet/:filename - Serve cropped, compressed snippet
-router.get('/mapguesser/snippet/:filename', async (req, res) => {
+// GET /api/mapguesser/snippet/:mapFolder/:filename - Serve cropped, compressed snippet
+router.get('/mapguesser/snippet/:mapFolder/:filename', async (req, res) => {
   try {
-    const { filename } = req.params;
+    const { mapFolder, filename } = req.params;
     const { seed, difficulty = 'medium' } = req.query;
     
-    const filePath = path.join(SCREENSHOTS_DIR, filename);
+    const filePath = path.join(SCREENSHOTS_DIR, mapFolder, filename);
     if (!fsSync.existsSync(filePath)) {
       return res.status(404).json({ error: 'Image not found' });
     }
