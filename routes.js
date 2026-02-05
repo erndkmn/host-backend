@@ -2,6 +2,12 @@
 const itemsTodayCache = {};
 // Simple in-memory cache for /weaponsNew/today
 const weaponsNewTodayCache = {};
+// Simple in-memory cache for /items/valued (with TTL)
+const valuedItemsCache = {
+  data: null,
+  expiry: 0
+};
+const VALUED_ITEMS_TTL = 60 * 60 * 1000; // 1 hour TTL
 
 import { pool } from "./db.js";
 import express from "express";
@@ -316,6 +322,64 @@ router.get("/items/today", async (req, res) => {
     res
       .status(500)
       .json({ error: "Failed to pull today's item", details: err.message });
+  }
+});
+
+// Get a random item that has a "value" key (cached with TTL)
+router.get("/items/valued", async (req, res) => {
+  try {
+    // Check if cache is valid
+    let allItems;
+    if (valuedItemsCache.data && Date.now() < valuedItemsCache.expiry) {
+      console.log("Using cached items for /items/valued");
+      allItems = valuedItemsCache.data;
+    } else {
+      console.log("Fetching items from API for /items/valued");
+      
+      // Fetch ALL items with pagination
+      let page = 1;
+      allItems = [];
+      let hasNext = true;
+
+      while (hasNext) {
+        const url = `https://metaforge.app/api/arc-raiders/items?page=${page}&limit=100`;
+        const response = await fetch(url);
+        const data = await response.json();
+
+        allItems.push(...data.data);
+
+        hasNext = data.pagination?.hasNextPage;
+        page++;
+
+        if (page > 100) break; // Safety limit
+      }
+
+      // Update cache with TTL
+      valuedItemsCache.data = allItems;
+      valuedItemsCache.expiry = Date.now() + VALUED_ITEMS_TTL;
+      
+      console.log(`Cached ${allItems.length} items for /items/valued`);
+    }
+
+    // Filter items that have a "value" key with a truthy value
+    const valuedItems = allItems.filter(item => item.value !== undefined && item.value !== null && item.value !== "");
+
+    if (valuedItems.length === 0) {
+      return res.status(404).json({ error: "No items with 'value' key found" });
+    }
+
+    // Pick a random item
+    const index = Math.floor(Math.random() * valuedItems.length);
+    const randomValuedItem = valuedItems[index];
+
+    console.log(`Returning valued item: ${randomValuedItem.name} (value: ${randomValuedItem.value})`);
+
+    res.json(randomValuedItem);
+  } catch (err) {
+    console.error("Error in /items/valued:", err);
+    res
+      .status(500)
+      .json({ error: "Failed to get valued item", details: err.message });
   }
 });
 
